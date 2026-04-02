@@ -66,7 +66,7 @@ public class RetroDamageIndicators {
         modEventBus.addListener(this::commonSetup);
         NeoForge.EVENT_BUS.register(RetroDamageIndicators.class);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
-        if (FMLEnvironment.dist.isClient()) {
+        if (FMLEnvironment.dist.isClient() && ModList.get().isLoaded("cloth_config")) {
             modContainer.registerExtensionPoint(IConfigScreenFactory.class, (container, parent) -> ConfigScreen.create(parent));
         }
     }
