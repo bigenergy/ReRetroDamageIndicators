@@ -3,6 +3,7 @@ package com.github.alexmodguy.retrodamageindicators.mixins;
 
 
 import com.github.alexmodguy.retrodamageindicators.Config;
+import com.github.alexmodguy.retrodamageindicators.RetroDamageIndicators;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -30,6 +31,7 @@ public abstract class LivingEntityMixin extends Entity {
     public abstract float getHealth();
 
     private float lastTrackedHealth = 0;
+    private boolean healthInitialized = false;
 
     @Inject(
             method = {"Lnet/minecraft/world/entity/LivingEntity;onSyncedDataUpdated(Lnet/minecraft/network/syncher/EntityDataAccessor;)V"},
@@ -38,10 +40,15 @@ public abstract class LivingEntityMixin extends Entity {
     )
     public void retroDamageIndicators_onSyncedDataUpdated(EntityDataAccessor<?> entityDataAccessor, CallbackInfo ci) {
         if (entityDataAccessor.equals(DATA_HEALTH_ID)) {
+            if (!healthInitialized) {
+                lastTrackedHealth = this.getHealth();
+                healthInitialized = true;
+                return;
+            }
             if (level().isClientSide && Config.INSTANCE.damageParticlesEnabled.get() && lastTrackedHealth != this.getHealth()) {
                 float difference = this.getHealth() - lastTrackedHealth;
                 if (!this.isRemoved() && this.isAddedToLevel()) {
-                    //RetroDamageIndicators.spawnHurtParticles(this, difference);
+                    RetroDamageIndicators.spawnHurtParticles(this, difference);
                 }
                 lastTrackedHealth = this.getHealth();
             }

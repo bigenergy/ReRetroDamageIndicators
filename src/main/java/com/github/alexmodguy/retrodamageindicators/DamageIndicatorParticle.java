@@ -58,7 +58,7 @@ public class DamageIndicatorParticle extends Particle {
         double z = (float) (Mth.lerp((double) partialTicks, this.zo, this.z));
         int color = heal ? 0X00FF00 : 0XFF0000;
         int colorOutline = heal ? 0X003300 : 0X330000;
-        float scale = this.getScale(partialTicks) * 0.035F;
+        float scale = this.getScale(partialTicks) * 0.035F * Config.INSTANCE.damageParticleSize.get().floatValue();
         PoseStack posestack = new PoseStack();
         posestack.pushPose();
         posestack.translate(x - cameraPos.x, y - cameraPos.y, z - cameraPos.z);
@@ -70,7 +70,7 @@ public class DamageIndicatorParticle extends Particle {
         if(Config.INSTANCE.damageParticleOutline.get()){
             Minecraft.getInstance().font.drawInBatch8xOutline(damageString.getVisualOrderText(), f, 0.0F, color, colorOutline, posestack.last().pose(), multibuffersource$buffersource, 15728880);
         }else{
-            Minecraft.getInstance().font.drawInBatch(damageString.getVisualOrderText(), f, 0.0F, color, false, posestack.last().pose(), multibuffersource$buffersource, Font.DisplayMode.NORMAL, 0, 15728880);
+            Minecraft.getInstance().font.drawInBatch(damageString.getVisualOrderText(), f, 0.0F, color, false, posestack.last().pose(), multibuffersource$buffersource, Font.DisplayMode.SEE_THROUGH, 0, 15728880);
         }
         multibuffersource$buffersource.endBatch();
         posestack.popPose();

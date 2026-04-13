@@ -22,9 +22,14 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
+import java.util.ArrayList;
+import java.util.List;
 import net.neoforged.neoforge.entity.PartEntity;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -64,6 +69,7 @@ public class RetroDamageIndicators {
     private static float displayedHealth = 0f;
     private static float lastKnownHealth = -1f;
     private static int damageFlashTicks = 0;
+    private static final List<DamageText> activeDamageTexts = new ArrayList<>();
 
     public RetroDamageIndicators(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
@@ -83,10 +89,21 @@ public class RetroDamageIndicators {
     }
 
     public static void spawnHurtParticles(Entity entity, float damage) {
+        if (Minecraft.getInstance().level == null) return;
+        if (activeDamageTexts.size() >= 100) return;
         double x = entity.getRandomX(1.0D);
         double y = entity.getEyeY();
         double z = entity.getRandomZ(1.0D);
-        Minecraft.getInstance().particleEngine.add(new DamageIndicatorParticle(Minecraft.getInstance().level, x, y, z, Math.abs(damage), damage > 0));
+        String textStr;
+        if (Config.INSTANCE.healthDecimals.get()) {
+            textStr = String.valueOf(roundHealth((float) Math.abs(damage))).replace(".0", "");
+        } else {
+            textStr = "" + (int) Math.abs(damage);
+        }
+        boolean heal = damage > 0;
+        int color = heal ? 0x00FF00 : 0xFF0000;
+        int colorOutline = heal ? 0x003300 : 0x330000;
+        activeDamageTexts.add(new DamageText(x, y, z, Component.literal(textStr), color, colorOutline));
     }
 
     @SubscribeEvent
@@ -353,7 +370,56 @@ public class RetroDamageIndicators {
             }
 
             if (damageFlashTicks > 0) damageFlashTicks--;
+
+            if (!Minecraft.getInstance().isPaused()) {
+                for (DamageText dt : activeDamageTexts) {
+                    dt.age++;
+                    dt.vy -= 0.04;
+                    dt.y += dt.vy;
+                }
+                activeDamageTexts.removeIf(dt -> dt.age >= dt.maxAge);
+            }
+        } else {
+            activeDamageTexts.clear();
         }
+    }
+
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) return;
+        if (activeDamageTexts.isEmpty() || !Config.INSTANCE.damageParticlesEnabled.get()) return;
+
+        Camera camera = event.getCamera();
+        PoseStack poseStack = event.getPoseStack();
+        MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
+        Vec3 cameraPos = camera.getPosition();
+
+        for (DamageText dt : activeDamageTexts) {
+            float lifeRatio = 1.0f - (float) dt.age / dt.maxAge;
+            float scale = 0.025f * lifeRatio * Config.INSTANCE.damageParticleSize.get().floatValue();
+            if (scale <= 0) continue;
+
+            poseStack.pushPose();
+            poseStack.translate(dt.x - cameraPos.x, dt.y - cameraPos.y, dt.z - cameraPos.z);
+            poseStack.mulPose(camera.rotation());
+            poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
+            poseStack.scale(scale, scale, scale);
+
+            float textX = -Minecraft.getInstance().font.width(dt.text) / 2f;
+            if (Config.INSTANCE.damageParticleOutline.get()) {
+                Minecraft.getInstance().font.drawInBatch8xOutline(
+                        dt.text.getVisualOrderText(), textX, 0f,
+                        dt.color, dt.colorOutline,
+                        poseStack.last().pose(), bufferSource, 15728880);
+            } else {
+                Minecraft.getInstance().font.drawInBatch(
+                        dt.text.getVisualOrderText(), textX, 0f,
+                        dt.color, false, poseStack.last().pose(), bufferSource,
+                        Font.DisplayMode.SEE_THROUGH, 0, 15728880);
+            }
+            poseStack.popPose();
+        }
+        bufferSource.endBatch();
     }
 
     public static void renderEntityInGui(GuiGraphics guiGraphics, int xPos, int yPos, float scale, Quaternionf rotation, Entity entity, float partialTicks) {
@@ -389,6 +455,27 @@ public class RetroDamageIndicators {
         entityrenderdispatcher.setRenderShadow(true);
         guiGraphics.pose().popPose();
         Lighting.setupFor3DItems();
+    }
+
+    static class DamageText {
+        double x, y, z;
+        final Component text;
+        final int color, colorOutline;
+        int age;
+        final int maxAge;
+        double vy;
+
+        DamageText(double x, double y, double z, Component text, int color, int colorOutline) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.text = text;
+            this.color = color;
+            this.colorOutline = colorOutline;
+            this.age = 0;
+            this.maxAge = 15 + (int) (Math.random() * 6);
+            this.vy = 0.15 + Math.random() * 0.15;
+        }
     }
 
 }
