@@ -56,7 +56,7 @@ public class Config {
         this.showModSource = builder.comment("Whether to show the name of the mod the entity comes from on the hud indicator.").translation("show_mod_source").define("show_mod_source", false);
         this.modSourceSize = builder.comment("Scale multiplier for the mod source text.").translation("mod_source_size").defineInRange("mod_source_size", 1.0, 0.1, 5.0);
         this.modSourceOffsetX = builder.comment("Horizontal offset of the mod source text in pixels (relative to default position).").translation("mod_source_offset_x").defineInRange("mod_source_offset_x", 0, -500, 500);
-        this.modSourceOffsetY = builder.comment("Vertical offset of the mod source text in pixels (relative to default position).").translation("mod_source_offset_y").defineInRange("mod_source_offset_y", 0, -500, 500);
+        this.modSourceOffsetY = builder.comment("Vertical offset of the mod source text in pixels (relative to default position).").translation("mod_source_offset_y").defineInRange("mod_source_offset_y", 5, -500, 500);
         this.modSourceColor = builder.comment("Color of the mod source text as an RGB integer (e.g. 0xAAAAAA = grey).").translation("mod_source_color").defineInRange("mod_source_color", 0xAAAAAA, 0x000000, 0xFFFFFF);
         this.oldRenderEntities = builder.comment("List of all entity_types to just render as a model instead of with entity context. add to this if an entity is rendering strangely.").defineList("hud_old_render_entities", List.of("alexsmobs:giant_squid"), (o) -> o instanceof String);
         builder.pop();

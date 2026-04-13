@@ -88,7 +88,7 @@ public class RetroDamageIndicators {
 
     @SubscribeEvent
     public static void onPreRenderGuiElement(RenderGuiLayerEvent.Pre event) {
-        if (Config.INSTANCE.hudIndicatorEnabled.get()) {
+        if (Config.INSTANCE.hudIndicatorEnabled.get() && Minecraft.getInstance().screen == null) {
 
             if (event.getName().equals(VanillaGuiLayers.BOSS_OVERLAY) && damageIndicatorEntity != null) {
                 float entityHealth = Math.min(damageIndicatorEntity.getHealth(), damageIndicatorEntity.getMaxHealth());

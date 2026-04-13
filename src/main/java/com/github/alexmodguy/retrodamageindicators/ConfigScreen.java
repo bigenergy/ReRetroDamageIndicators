@@ -132,7 +132,7 @@ public class ConfigScreen {
                 .build());
 
         hud.addEntry(eb.startIntField(Component.literal("Mod Source Offset Y"), Config.INSTANCE.modSourceOffsetY.get())
-                .setDefaultValue(0)
+                .setDefaultValue(5)
                 .setTooltip(Component.literal("Vertical pixel offset from the default position."))
                 .setSaveConsumer(v -> Config.INSTANCE.modSourceOffsetY.set(v))
                 .build());
