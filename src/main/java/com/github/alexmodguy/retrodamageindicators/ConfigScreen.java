@@ -118,6 +118,31 @@ public class ConfigScreen {
                 .setSaveConsumer(v -> Config.INSTANCE.showModSource.set(v))
                 .build());
 
+        hud.addEntry(eb.startDoubleField(Component.literal("Mod Source Size"), Config.INSTANCE.modSourceSize.get())
+                .setDefaultValue(1.0)
+                .setMin(0.1).setMax(5.0)
+                .setTooltip(Component.literal("Scale multiplier for the mod source text."))
+                .setSaveConsumer(v -> Config.INSTANCE.modSourceSize.set(v))
+                .build());
+
+        hud.addEntry(eb.startIntField(Component.literal("Mod Source Offset X"), Config.INSTANCE.modSourceOffsetX.get())
+                .setDefaultValue(0)
+                .setTooltip(Component.literal("Horizontal pixel offset from the default position."))
+                .setSaveConsumer(v -> Config.INSTANCE.modSourceOffsetX.set(v))
+                .build());
+
+        hud.addEntry(eb.startIntField(Component.literal("Mod Source Offset Y"), Config.INSTANCE.modSourceOffsetY.get())
+                .setDefaultValue(0)
+                .setTooltip(Component.literal("Vertical pixel offset from the default position."))
+                .setSaveConsumer(v -> Config.INSTANCE.modSourceOffsetY.set(v))
+                .build());
+
+        hud.addEntry(eb.startColorField(Component.literal("Mod Source Color"), Config.INSTANCE.modSourceColor.get())
+                .setDefaultValue(0xAAAAAA)
+                .setTooltip(Component.literal("Color of the mod source text."))
+                .setSaveConsumer(v -> Config.INSTANCE.modSourceColor.set(v))
+                .build());
+
         // --- Damage Particles ---
         ConfigCategory particles = builder.getOrCreateCategory(Component.literal("Damage Particles"));
 

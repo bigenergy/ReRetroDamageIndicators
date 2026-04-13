@@ -256,15 +256,17 @@ public class RetroDamageIndicators {
                 if (Config.INSTANCE.showModSource.get() && !currentModSource.isEmpty()) {
                     Component modSourceComponent = Component.literal("[" + currentModSource + "]");
                     int modSourceWidth = Minecraft.getInstance().font.width(modSourceComponent);
-                    float modSourceScale = Math.min(110F / modSourceWidth, 0.75F);
-                    float modSourceOffsetX = 143F;
-                    float modSourceOffsetY = 46F;
+                    float maxScale = Config.INSTANCE.modSourceSize.get().floatValue();
+                    float modSourceScale = Math.min(110F / modSourceWidth, maxScale);
+                    float modSourceX = 143F + Config.INSTANCE.modSourceOffsetX.get();
+                    float modSourceY = 46F + Config.INSTANCE.modSourceOffsetY.get();
+                    int modSourceColor = Config.INSTANCE.modSourceColor.get();
 
                     poseStack.pushPose();
-                    poseStack.translate(modSourceOffsetX, modSourceOffsetY, -50);
+                    poseStack.translate(modSourceX, modSourceY, -50);
                     poseStack.scale(modSourceScale, modSourceScale, 1);
                     poseStack.translate(-modSourceWidth / 2F, 0, 0);
-                    Minecraft.getInstance().font.drawInBatch(modSourceComponent.getVisualOrderText(), 0.0F, 0.0F, 0xAAAAAA, false, poseStack.last().pose(), event.getGuiGraphics().bufferSource(), Font.DisplayMode.NORMAL, 0, 15728880);
+                    Minecraft.getInstance().font.drawInBatch(modSourceComponent.getVisualOrderText(), 0.0F, 0.0F, modSourceColor, false, poseStack.last().pose(), event.getGuiGraphics().bufferSource(), Font.DisplayMode.NORMAL, 0, 15728880);
                     poseStack.popPose();
                 }
 
