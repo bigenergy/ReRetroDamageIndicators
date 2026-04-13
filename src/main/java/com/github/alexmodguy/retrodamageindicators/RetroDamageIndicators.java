@@ -61,6 +61,9 @@ public class RetroDamageIndicators {
     private static String currentModSource = "";
     private static int resetDamageIndicatorEntityIn = 0;
     private static boolean renderModelOnly;
+    private static float displayedHealth = 0f;
+    private static float lastKnownHealth = -1f;
+    private static int damageFlashTicks = 0;
 
     public RetroDamageIndicators(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
@@ -91,8 +94,8 @@ public class RetroDamageIndicators {
         if (Config.INSTANCE.hudIndicatorEnabled.get() && Minecraft.getInstance().screen == null) {
 
             if (event.getName().equals(VanillaGuiLayers.BOSS_OVERLAY) && damageIndicatorEntity != null) {
-                float entityHealth = Math.min(damageIndicatorEntity.getHealth(), damageIndicatorEntity.getMaxHealth());
                 float entityMaxHealth = damageIndicatorEntity.getMaxHealth();
+                float entityHealth = Math.min(Config.INSTANCE.hpBarAnimated.get() ? displayedHealth : damageIndicatorEntity.getHealth(), entityMaxHealth);
                 float healthRatio = entityMaxHealth <= 0.0F ? 0.0F : entityHealth / entityMaxHealth;
                 float scale = Config.INSTANCE.hudIndicatorSize.get().floatValue();
                 int xOffset = Config.INSTANCE.hudIndicatorAlignLeft.get() ? Config.INSTANCE.hudIndicatorPositionX.get() : event.getGuiGraphics().guiWidth() - (int) (208 * scale) - Config.INSTANCE.hudIndicatorPositionX.get();
@@ -270,6 +273,13 @@ public class RetroDamageIndicators {
                     poseStack.popPose();
                 }
 
+                // damage flash overlay
+                if (Config.INSTANCE.damageFlash.get() && damageFlashTicks > 0) {
+                    float flashAlpha = (damageFlashTicks / (float) Config.INSTANCE.damageFlashDuration.get()) * 0.45f;
+                    int color = ((int)(flashAlpha * 255) << 24) | 0xFF2200;
+                    event.getGuiGraphics().fill(0, 0, 208, 78, color);
+                }
+
                 poseStack.popPose();
             }
 
@@ -306,6 +316,26 @@ public class RetroDamageIndicators {
                 }
             }
             if (found != null) {
+                float currentHealth = found.getHealth();
+
+                // reset animation state when switching target
+                if (found != damageIndicatorEntity) {
+                    displayedHealth = currentHealth;
+                    lastKnownHealth = currentHealth;
+                    damageFlashTicks = 0;
+                }
+
+                // detect damage for flash
+                if (Config.INSTANCE.damageFlash.get() && currentHealth < lastKnownHealth - 0.01f) {
+                    damageFlashTicks = Config.INSTANCE.damageFlashDuration.get();
+                }
+                lastKnownHealth = currentHealth;
+
+                // animate health bar
+                float speed = Config.INSTANCE.hpBarAnimationSpeed.get().floatValue();
+                displayedHealth += (currentHealth - displayedHealth) * speed;
+                if (Math.abs(displayedHealth - currentHealth) < 0.05f) displayedHealth = currentHealth;
+
                 damageIndicatorEntity = found;
                 currentMobType = MobTypes.getTypeFor(found);
                 resetDamageIndicatorEntityIn = Config.INSTANCE.hudLingerTime.get();
@@ -317,8 +347,12 @@ public class RetroDamageIndicators {
             } else if (resetDamageIndicatorEntityIn-- < 0) {
                 damageIndicatorEntity = null;
                 currentModSource = "";
+                displayedHealth = 0f;
+                lastKnownHealth = -1f;
                 resetDamageIndicatorEntityIn = 0;
             }
+
+            if (damageFlashTicks > 0) damageFlashTicks--;
         }
     }
 

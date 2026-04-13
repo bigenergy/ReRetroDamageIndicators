@@ -102,6 +102,31 @@ public class ConfigScreen {
                 .setSaveConsumer(v -> Config.INSTANCE.healthSeperator.set(v))
                 .build());
 
+        hud.addEntry(eb.startBooleanToggle(Component.literal("HP Bar Animated"), Config.INSTANCE.hpBarAnimated.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("Smoothly animate the health bar when the entity takes damage or heals."))
+                .setSaveConsumer(v -> Config.INSTANCE.hpBarAnimated.set(v))
+                .build());
+
+        hud.addEntry(eb.startDoubleField(Component.literal("HP Bar Animation Speed"), Config.INSTANCE.hpBarAnimationSpeed.get())
+                .setDefaultValue(0.15)
+                .setMin(0.01).setMax(1.0)
+                .setTooltip(Component.literal("Per-tick lerp speed. Higher = faster animation."))
+                .setSaveConsumer(v -> Config.INSTANCE.hpBarAnimationSpeed.set(v))
+                .build());
+
+        hud.addEntry(eb.startBooleanToggle(Component.literal("Damage Flash"), Config.INSTANCE.damageFlash.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("Flash the indicator red when the entity takes damage."))
+                .setSaveConsumer(v -> Config.INSTANCE.damageFlash.set(v))
+                .build());
+
+        hud.addEntry(eb.startIntSlider(Component.literal("Flash Duration (ticks)"), Config.INSTANCE.damageFlashDuration.get(), 2, 30)
+                .setDefaultValue(8)
+                .setTooltip(Component.literal("How many ticks the red flash lasts (20 ticks = 1 second)."))
+                .setSaveConsumer(v -> Config.INSTANCE.damageFlashDuration.set(v))
+                .build());
+
         hud.addEntry(eb.startBooleanToggle(Component.literal("Name Text Outline"), Config.INSTANCE.hudNameTextOutline.get())
                 .setDefaultValue(false)
                 .setSaveConsumer(v -> Config.INSTANCE.hudNameTextOutline.set(v))

@@ -24,6 +24,10 @@ public class Config {
     public final ModConfigSpec.DoubleValue hudEntitySize;
     public final ModConfigSpec.BooleanValue hudNameTextOutline;
     public final ModConfigSpec.BooleanValue hudHealthTextOutline;
+    public final ModConfigSpec.BooleanValue hpBarAnimated;
+    public final ModConfigSpec.DoubleValue hpBarAnimationSpeed;
+    public final ModConfigSpec.BooleanValue damageFlash;
+    public final ModConfigSpec.IntValue damageFlashDuration;
     public final ModConfigSpec.BooleanValue showModSource;
     public final ModConfigSpec.DoubleValue modSourceSize;
     public final ModConfigSpec.IntValue modSourceOffsetX;
@@ -53,6 +57,10 @@ public class Config {
         this.hudEntitySize = builder.comment("The size in pixels a usual entity should render as in the hud indicator.").translation("hud_entity_size").defineInRange("hud_entity_size", (double)38.0F, (double)0.0F, (double)2000.0F);
         this.hudNameTextOutline = builder.comment("Whether the name of the entity in the hud indicator should be outlined.").translation("hud_name_text_outline").define("hud_name_text_outline", false);
         this.hudHealthTextOutline = builder.comment("Whether the health of the entity in the hud indicator should be outlined.").translation("hud_health_text_outline").define("hud_health_text_outline", false);
+        this.hpBarAnimated = builder.comment("Whether the health bar smoothly animates when the entity takes damage or heals.").translation("hp_bar_animated").define("hp_bar_animated", true);
+        this.hpBarAnimationSpeed = builder.comment("How fast the health bar animation is (per tick lerp factor). Higher = faster.").translation("hp_bar_animation_speed").defineInRange("hp_bar_animation_speed", 0.15, 0.01, 1.0);
+        this.damageFlash = builder.comment("Whether the indicator flashes red when the entity takes damage.").translation("damage_flash").define("damage_flash", true);
+        this.damageFlashDuration = builder.comment("How many ticks the damage flash lasts.").translation("damage_flash_duration").defineInRange("damage_flash_duration", 8, 2, 30);
         this.showModSource = builder.comment("Whether to show the name of the mod the entity comes from on the hud indicator.").translation("show_mod_source").define("show_mod_source", false);
         this.modSourceSize = builder.comment("Scale multiplier for the mod source text.").translation("mod_source_size").defineInRange("mod_source_size", 1.0, 0.1, 5.0);
         this.modSourceOffsetX = builder.comment("Horizontal offset of the mod source text in pixels (relative to default position).").translation("mod_source_offset_x").defineInRange("mod_source_offset_x", 0, -500, 500);
