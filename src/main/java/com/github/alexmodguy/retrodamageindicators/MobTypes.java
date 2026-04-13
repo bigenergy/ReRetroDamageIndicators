@@ -1,11 +1,11 @@
 package com.github.alexmodguy.retrodamageindicators;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ambient.AmbientCreature;
-import net.minecraft.world.entity.animal.AbstractGolem;
-import net.minecraft.world.entity.animal.WaterAnimal;
+import net.minecraft.world.entity.animal.golem.AbstractGolem;
+import net.minecraft.world.entity.animal.fish.WaterAnimal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.entity.player.Player;
@@ -32,9 +32,9 @@ public enum MobTypes {
     UNKNOWN,
     BOSS;
 
-    private final ResourceLocation texture;
+    private final Identifier texture;
     MobTypes(){
-        texture = ResourceLocation.fromNamespaceAndPath("retrodamageindicators", "textures/gui/mob_types/" + name().toLowerCase(Locale.ROOT) + ".png");
+        texture = Identifier.fromNamespaceAndPath("retrodamageindicators", "textures/gui/mob_types/" + name().toLowerCase(Locale.ROOT) + ".png");
     }
 
     public static MobTypes getTypeFor(Entity entity){
@@ -73,7 +73,7 @@ public enum MobTypes {
         return UNKNOWN;
     }
 
-    public ResourceLocation getTexture() {
+    public Identifier getTexture() {
         return texture;
     }
 }
