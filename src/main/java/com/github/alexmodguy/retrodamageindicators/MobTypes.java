@@ -42,16 +42,16 @@ public enum MobTypes {
             return PLAYER;
         }
         if(entity instanceof LivingEntity living){
-            if(living.getType().is(Tags.EntityTypes.BOSSES)){
+            if(living.getType().builtInRegistryHolder().is(Tags.EntityTypes.BOSSES)){
                 return BOSS;
             }
-            if(living.getType().is(EntityTypeTags.AQUATIC)){
+            if(living.getType().builtInRegistryHolder().is(EntityTypeTags.AQUATIC)){
                 return living instanceof Enemy ? WATER_MONSTER : WATER_ANIMAL;
-            }else if(living.getType().is(EntityTypeTags.UNDEAD)){
+            }else if(living.getType().builtInRegistryHolder().is(EntityTypeTags.UNDEAD)){
                 return living instanceof Enemy ? UNDEAD : UNDEAD_ANIMAL;
-            }else if(living.getType().is(EntityTypeTags.ARTHROPOD)){
+            }else if(living.getType().builtInRegistryHolder().is(EntityTypeTags.ARTHROPOD)){
                 return living instanceof WaterAnimal || living.canBreatheUnderwater() ? WATER_ARTHROPOD : living instanceof Enemy ? ARTHROPOD_MONSTER : ARTHROPOD;
-            }else if(living.getType().is(EntityTypeTags.ILLAGER)){
+            }else if(living.getType().builtInRegistryHolder().is(EntityTypeTags.ILLAGER)){
                 return ILLAGER;
             }
             if(living instanceof AbstractGolem){

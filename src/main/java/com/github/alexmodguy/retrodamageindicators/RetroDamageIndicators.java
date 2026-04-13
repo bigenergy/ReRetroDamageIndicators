@@ -5,11 +5,11 @@ import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
@@ -138,7 +138,7 @@ public class RetroDamageIndicators {
                 pose.translate(xOffset, yOffset - 0.5F);
                 pose.scale(scale, scale);
 
-                // entity render - must use absolute coords since submitEntityRenderState ignores pose matrix
+                // entity render - must use absolute coords since entity rendering ignores pose matrix
                 int scissorBox1MinX = 16;
                 int scissorBox1MinY = 4;
                 int scissorBox1MaxX = 73;
@@ -158,14 +158,20 @@ public class RetroDamageIndicators {
                     int absBoxX2 = xOffset + Math.round(scale * scissorBox1MaxX);
                     int absBoxY2 = (int)(yOffset + scale * scissorBox2MaxY);
 
+                    // Compute mouse position to achieve desired rotation angles
+                    float centerX = (absBoxX1 + absBoxX2) / 2.0F;
+                    float centerY = (absBoxY1 + absBoxY2) / 2.0F;
+                    float mouseX = centerX + 17;  // produces angleX ≈ -0.4 via atan
+                    float mouseY = centerY - 12;  // produces angleY ≈ 0.3 via atan
+
                     // Pop the matrix so entity renders in absolute coords
                     pose.popMatrix();
                     event.getGuiGraphics().enableScissor(absBoxX1, absBoxY1, absBoxX2, absBoxY2);
-                    InventoryScreen.renderEntityInInventoryFollowsAngle(
+                    InventoryScreen.extractEntityInInventoryFollowsMouse(
                             event.getGuiGraphics(),
                             absBoxX1, absBoxY1, absBoxX2, absBoxY2,
                             renderScale, 0.0625F,
-                            -0.4F, 0.3F,
+                            mouseX, mouseY,
                             damageIndicatorEntity);
                     event.getGuiGraphics().disableScissor();
                     // Push the matrix back for remaining rendering
@@ -219,7 +225,7 @@ public class RetroDamageIndicators {
                 pose.translate(healthOffsetX, healthOffsetY);
                 pose.scale(healthScale, healthScale);
                 pose.translate(-firstHalfWidth, 0);
-                event.getGuiGraphics().drawString(Minecraft.getInstance().font, healthComponent, 0, 0, healthColor, Config.INSTANCE.hudHealthTextOutline.get());
+                event.getGuiGraphics().text(Minecraft.getInstance().font, healthComponent, 0, 0, healthColor, Config.INSTANCE.hudHealthTextOutline.get());
                 pose.popMatrix();
 
                 // name text
@@ -234,7 +240,7 @@ public class RetroDamageIndicators {
                 pose.translate(nameOffsetX, nameOffsetY);
                 pose.scale(nameScale, nameScale);
                 pose.translate(-nameWidth / 2F, 0);
-                event.getGuiGraphics().drawString(Minecraft.getInstance().font, nameComponent, 0, 0, nameColor, Config.INSTANCE.hudNameTextOutline.get());
+                event.getGuiGraphics().text(Minecraft.getInstance().font, nameComponent, 0, 0, nameColor, Config.INSTANCE.hudNameTextOutline.get());
                 pose.popMatrix();
 
                 // mod source text
@@ -251,7 +257,7 @@ public class RetroDamageIndicators {
                     pose.translate(modSourceX, modSourceY);
                     pose.scale(modSourceScale, modSourceScale);
                     pose.translate(-modSourceWidth / 2F, 0);
-                    event.getGuiGraphics().drawString(Minecraft.getInstance().font, modSourceComponent, 0, 0, modSourceColor, false);
+                    event.getGuiGraphics().text(Minecraft.getInstance().font, modSourceComponent, 0, 0, modSourceColor, false);
                     pose.popMatrix();
                 }
 
@@ -350,7 +356,7 @@ public class RetroDamageIndicators {
     }
 
     @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent.AfterEntities event) {
+    public static void onRenderLevel(RenderLevelStageEvent.AfterOpaqueFeatures event) {
         if (activeDamageTexts.isEmpty() || !Config.INSTANCE.damageParticlesEnabled.get()) return;
 
         CameraRenderState cameraState = event.getLevelRenderState().cameraRenderState;
