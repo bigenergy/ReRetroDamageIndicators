@@ -7,8 +7,8 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -22,7 +22,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,14 +94,14 @@ public class RetroDamageIndicators {
             textStr = "" + (int) Math.abs(damage);
         }
         boolean heal = damage > 0;
-        int color = heal ? 0x00FF00 : 0xFF0000;
-        int colorOutline = heal ? 0x003300 : 0x330000;
+        int color = heal ? 0xFF00FF00 : 0xFFFF0000;
+        int colorOutline = heal ? 0xFF003300 : 0xFF330000;
         activeDamageTexts.add(new DamageText(x, y, z, Component.literal(textStr), color, colorOutline));
     }
 
     @SubscribeEvent
     public static void onPreRenderGuiElement(RenderGuiLayerEvent.Pre event) {
-        if (Config.INSTANCE.hudIndicatorEnabled.get() && Minecraft.getInstance().screen == null) {
+        if (Config.INSTANCE.hudIndicatorEnabled.get() && Minecraft.getInstance().gui.screen() == null) {
 
             if (event.getName().equals(VanillaGuiLayers.BOSS_OVERLAY) && damageIndicatorEntity != null) {
                 float entityMaxHealth = damageIndicatorEntity.getMaxHealth();
@@ -138,7 +138,6 @@ public class RetroDamageIndicators {
                 pose.translate(xOffset, yOffset - 0.5F);
                 pose.scale(scale, scale);
 
-                // entity render - must use absolute coords since entity rendering ignores pose matrix
                 int scissorBox1MinX = 16;
                 int scissorBox1MinY = 4;
                 int scissorBox1MaxX = 73;
@@ -152,19 +151,16 @@ public class RetroDamageIndicators {
                     }
                     renderScale = (int)(renderScale * scale);
 
-                    // All absolute screen coordinates
                     int absBoxX1 = xOffset + Math.round(scale * scissorBox1MinX);
                     int absBoxY1 = (int)(yOffset + scale * scissorBox1MinY);
                     int absBoxX2 = xOffset + Math.round(scale * scissorBox1MaxX);
                     int absBoxY2 = (int)(yOffset + scale * scissorBox2MaxY);
 
-                    // Compute mouse position to achieve desired rotation angles
                     float centerX = (absBoxX1 + absBoxX2) / 2.0F;
                     float centerY = (absBoxY1 + absBoxY2) / 2.0F;
-                    float mouseX = centerX + 17;  // produces angleX ≈ -0.4 via atan
-                    float mouseY = centerY - 12;  // produces angleY ≈ 0.3 via atan
+                    float mouseX = centerX + 17;
+                    float mouseY = centerY - 12;
 
-                    // Pop the matrix so entity renders in absolute coords
                     pose.popMatrix();
                     event.getGuiGraphics().enableScissor(absBoxX1, absBoxY1, absBoxX2, absBoxY2);
                     InventoryScreen.extractEntityInInventoryFollowsMouse(
@@ -174,30 +170,24 @@ public class RetroDamageIndicators {
                             mouseX, mouseY,
                             damageIndicatorEntity);
                     event.getGuiGraphics().disableScissor();
-                    // Push the matrix back for remaining rendering
                     pose.pushMatrix();
                     pose.translate(xOffset, yOffset - 0.5F);
                     pose.scale(scale, scale);
                 }
 
-                // background render with opacity
                 int bgColor = ((int)(backgroundOpacity * 255) << 24) | 0xFFFFFF;
                 event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_BACKGROUND_TEXTURE, 0, 0, 0, 0, 208, 78, 256, 256, bgColor);
 
-                // foreground render
                 event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_TEXTURE, 0, 0, 0, 0, 208, 78, 256, 256);
 
-                // mob type render
                 int relativeMobTypeX = 5;
                 int relativeMobTypeY = 55;
                 event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, currentMobType.getTexture(), relativeMobTypeX, relativeMobTypeY, 0, 0, 18, 18, 18, 18);
 
-                // health render
                 int healthbarVOffset = Config.INSTANCE.colorblindHealthBar.get() ? 36 : 0;
                 event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 0, healthbarVOffset + 18, healthbarMaxWidth, healthbarHeight, 256, 256);
                 event.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 0, healthbarVOffset, currentHealthbarWidth, healthbarHeight, 256, 256);
 
-                // health text
                 String healthText;
                 float healthOffsetX = 136;
                 float healthOffsetY = 30;
@@ -228,7 +218,6 @@ public class RetroDamageIndicators {
                 event.getGuiGraphics().text(Minecraft.getInstance().font, healthComponent, 0, 0, healthColor, Config.INSTANCE.hudHealthTextOutline.get());
                 pose.popMatrix();
 
-                // name text
                 Component nameComponent = damageIndicatorEntity.getDisplayName();
                 int nameWidth = Minecraft.getInstance().font.width(nameComponent);
                 float nameScale = Math.min(113F / (float) nameWidth, 1.25F);
@@ -243,7 +232,6 @@ public class RetroDamageIndicators {
                 event.getGuiGraphics().text(Minecraft.getInstance().font, nameComponent, 0, 0, nameColor, Config.INSTANCE.hudNameTextOutline.get());
                 pose.popMatrix();
 
-                // mod source text
                 if (Config.INSTANCE.showModSource.get() && !currentModSource.isEmpty()) {
                     Component modSourceComponent = Component.literal("[" + currentModSource + "]");
                     int modSourceWidth = Minecraft.getInstance().font.width(modSourceComponent);
@@ -261,7 +249,6 @@ public class RetroDamageIndicators {
                     pose.popMatrix();
                 }
 
-                // damage flash overlay
                 if (Config.INSTANCE.damageFlash.get() && damageFlashTicks > 0) {
                     float flashAlpha = (damageFlashTicks / (float) Config.INSTANCE.damageFlashDuration.get()) * 0.45f;
                     int color = ((int)(flashAlpha * 255) << 24) | 0xFF2200;
@@ -307,20 +294,17 @@ public class RetroDamageIndicators {
             if (found != null) {
                 float currentHealth = found.getHealth();
 
-                // reset animation state when switching target
                 if (found != damageIndicatorEntity) {
                     displayedHealth = currentHealth;
                     lastKnownHealth = currentHealth;
                     damageFlashTicks = 0;
                 }
 
-                // detect damage for flash
                 if (Config.INSTANCE.damageFlash.get() && currentHealth < lastKnownHealth - 0.01f) {
                     damageFlashTicks = Config.INSTANCE.damageFlashDuration.get();
                 }
                 lastKnownHealth = currentHealth;
 
-                // animate health bar
                 float speed = Config.INSTANCE.hpBarAnimationSpeed.get().floatValue();
                 displayedHealth += (currentHealth - displayedHealth) * speed;
                 if (Math.abs(displayedHealth - currentHealth) < 0.05f) displayedHealth = currentHealth;
@@ -356,12 +340,12 @@ public class RetroDamageIndicators {
     }
 
     @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent.AfterOpaqueFeatures event) {
+    public static void onSubmitCustomGeometry(SubmitCustomGeometryEvent event) {
         if (activeDamageTexts.isEmpty() || !Config.INSTANCE.damageParticlesEnabled.get()) return;
 
         CameraRenderState cameraState = event.getLevelRenderState().cameraRenderState;
         PoseStack poseStack = event.getPoseStack();
-        MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
+        SubmitNodeCollector collector = event.getSubmitNodeCollector();
         Vec3 cameraPos = cameraState.pos;
         Quaternionf cameraRotation = cameraState.orientation;
 
@@ -377,20 +361,11 @@ public class RetroDamageIndicators {
             poseStack.scale(dtScale, dtScale, dtScale);
 
             float textX = -Minecraft.getInstance().font.width(dt.text) / 2f;
-            if (Config.INSTANCE.damageParticleOutline.get()) {
-                Minecraft.getInstance().font.drawInBatch8xOutline(
-                        dt.text.getVisualOrderText(), textX, 0f,
-                        dt.color, dt.colorOutline,
-                        poseStack.last().pose(), bufferSource, 15728880);
-            } else {
-                Minecraft.getInstance().font.drawInBatch(
-                        dt.text.getVisualOrderText(), textX, 0f,
-                        dt.color, false, poseStack.last().pose(), bufferSource,
-                        Font.DisplayMode.SEE_THROUGH, 0, 15728880);
-            }
+            int outlineColor = Config.INSTANCE.damageParticleOutline.get() ? dt.colorOutline : 0;
+            collector.submitText(poseStack, textX, 0f, dt.text.getVisualOrderText(), false,
+                    Font.DisplayMode.SEE_THROUGH, 0, dt.color, 15728880, outlineColor);
             poseStack.popPose();
         }
-        bufferSource.endBatch();
     }
 
     static class DamageText {
