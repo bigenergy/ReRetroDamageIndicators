@@ -6,7 +6,8 @@
   "description": "A mob health indicator on the in-game HUD that is reminiscent of modded days long gone...",
   "authors": [
     "Alexthe668",
-    "DrogaMleczna"
+    "DrogaMleczna",
+    "bigenergy"
   ],
   "license": "GNU",
   "environment": "client",
@@ -23,8 +24,8 @@
   ],
   "depends": {
     "fabricloader": ">=0.15.0",
-    "minecraft": ">=1.21",
-    "java": ">=21",
+    "minecraft": ">=26.2",
+    "java": ">=25",
     "fabric-api": "*"
   },
   "suggests": {

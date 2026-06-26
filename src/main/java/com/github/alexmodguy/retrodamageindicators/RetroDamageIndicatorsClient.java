@@ -1,28 +1,27 @@
 package com.github.alexmodguy.retrodamageindicators;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 import com.mojang.math.Axis;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -32,9 +31,8 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
+import org.joml.Matrix3x2fStack;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -44,15 +42,13 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
     public static final String MODID = "retrodamageindicators";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final ResourceLocation DAMAGE_INDICATOR_TEXTURE = ResourceLocation.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator.png");
-    private static final ResourceLocation DAMAGE_INDICATOR_BACKGROUND_TEXTURE = ResourceLocation.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator_background.png");
-    private static final ResourceLocation DAMAGE_INDICATOR_HEALTH_TEXTURE = ResourceLocation.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator_health.png");
-    private static final Quaternionf ENTITY_ROTATION = (new Quaternionf()).rotationXYZ((float) Math.toRadians(30), (float) Math.toRadians(130), (float) Math.PI);
+    private static final Identifier DAMAGE_INDICATOR_TEXTURE = Identifier.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator.png");
+    private static final Identifier DAMAGE_INDICATOR_BACKGROUND_TEXTURE = Identifier.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator_background.png");
+    private static final Identifier DAMAGE_INDICATOR_HEALTH_TEXTURE = Identifier.fromNamespaceAndPath(MODID, "textures/gui/damage_indicator_health.png");
     private static LivingEntity damageIndicatorEntity;
     private static MobTypes currentMobType = MobTypes.UNKNOWN;
     private static String currentModSource = "";
     private static int resetDamageIndicatorEntityIn = 0;
-    private static boolean renderModelOnly;
     private static float displayedHealth = 0f;
     private static float lastKnownHealth = -1f;
     private static int damageFlashTicks = 0;
@@ -61,9 +57,12 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         Config.INSTANCE.load();
-        HudRenderCallback.EVENT.register(RetroDamageIndicatorsClient::onHudRender);
+        HudElementRegistry.attachElementBefore(
+                VanillaHudElements.CHAT,
+                Identifier.fromNamespaceAndPath(MODID, "damage_indicator"),
+                (HudElement) RetroDamageIndicatorsClient::onHudRender);
         ClientTickEvents.END_CLIENT_TICK.register(RetroDamageIndicatorsClient::onClientTick);
-        WorldRenderEvents.AFTER_ENTITIES.register(RetroDamageIndicatorsClient::onWorldRender);
+        LevelRenderEvents.AFTER_SOLID_FEATURES.register(RetroDamageIndicatorsClient::onWorldRender);
     }
 
     public static float roundHealth(float entityHealth) {
@@ -83,13 +82,13 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
             textStr = "" + (int) Math.abs(damage);
         }
         boolean heal = damage > 0;
-        int color = heal ? 0x00FF00 : 0xFF0000;
-        int colorOutline = heal ? 0x003300 : 0x330000;
+        int color = heal ? 0xFF00FF00 : 0xFFFF0000;
+        int colorOutline = heal ? 0xFF003300 : 0xFF330000;
         activeDamageTexts.add(new DamageText(x, y, z, Component.literal(textStr), color, colorOutline));
     }
 
-    private static void onHudRender(GuiGraphics guiGraphics, net.minecraft.client.DeltaTracker tickCounter) {
-        if (!Config.INSTANCE.hudIndicatorEnabled.get() || Minecraft.getInstance().screen != null) return;
+    private static void onHudRender(GuiGraphicsExtractor guiGraphics, net.minecraft.client.DeltaTracker tickCounter) {
+        if (!Config.INSTANCE.hudIndicatorEnabled.get() || Minecraft.getInstance().gui.screen() != null) return;
         if (damageIndicatorEntity == null) return;
 
         float entityMaxHealth = damageIndicatorEntity.getMaxHealth();
@@ -119,52 +118,63 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
         int healthbarHeight = 18;
         int healthbarMaxWidth = 124;
         int currentHealthbarWidth = (int) Math.round(healthbarMaxWidth * healthRatio);
-        PoseStack poseStack = guiGraphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(xOffset, yOffset - 0.5F, 0);
-        poseStack.scale(scale, scale, scale);
+        Matrix3x2fStack pose = guiGraphics.pose();
+        pose.pushMatrix();
+        pose.translate(xOffset, yOffset - 0.5F);
+        pose.scale(scale, scale);
 
-        int scissorBox1MinX = 16, scissorBox1MinY = 4, scissorBox1MaxX = 73, scissorBox1MaxY = 49;
-        int scissorBox2MinX = 28, scissorBox2MinY = 49, scissorBox2MaxX = 73, scissorBox2MaxY = 61;
-        int entityX = 45, entityY = 56;
+        int scissorBox1MinX = 16;
+        int scissorBox1MinY = 4;
+        int scissorBox1MaxX = 73;
+        int scissorBox2MaxY = 61;
 
-        guiGraphics.enableScissor(xOffset + Math.round(scale * scissorBox1MinX), yOffset + Math.round(scale * scissorBox1MinY), xOffset + Math.round(scale * scissorBox1MaxX), yOffset + Math.round(scale * scissorBox1MaxY));
-        renderEntityInGui(guiGraphics, entityX, entityY, computeRenderScale(), ENTITY_ROTATION, damageIndicatorEntity, tickCounter.getGameTimeDeltaPartialTick(true));
-        guiGraphics.disableScissor();
-        guiGraphics.enableScissor(xOffset + Math.round(scale * scissorBox2MinX), yOffset + Math.round(scale * scissorBox2MinY), xOffset + Math.round(scale * scissorBox2MaxX), yOffset + Math.round(scale * scissorBox2MaxY));
-        renderEntityInGui(guiGraphics, entityX, entityY, computeRenderScale(), ENTITY_ROTATION, damageIndicatorEntity, tickCounter.getGameTimeDeltaPartialTick(true));
-        guiGraphics.disableScissor();
+        if (damageIndicatorEntity != null) {
+            float biggestEntityDimension = Math.max(damageIndicatorEntity.getBbWidth() * 1.2F + 0.3F, damageIndicatorEntity.getBbHeight() * 0.9F) * 0.85F;
+            int renderScale = (int) Config.INSTANCE.hudEntitySize.get().floatValue();
+            if ((double) biggestEntityDimension > 0.5D) {
+                renderScale = (int)(renderScale / biggestEntityDimension);
+            }
+            renderScale = (int)(renderScale * scale);
 
-        poseStack.pushPose();
-        poseStack.translate(0, 0, -200);
+            int absBoxX1 = xOffset + Math.round(scale * scissorBox1MinX);
+            int absBoxY1 = (int)(yOffset + scale * scissorBox1MinY);
+            int absBoxX2 = xOffset + Math.round(scale * scissorBox1MaxX);
+            int absBoxY2 = (int)(yOffset + scale * scissorBox2MaxY);
 
-        RenderSystem.enableBlend();
-        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ZERO, GlStateManager.DestFactor.ONE);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, backgroundOpacity);
-        guiGraphics.blit(DAMAGE_INDICATOR_BACKGROUND_TEXTURE, 0, 0, 50, 0, 0, 208, 78, 256, 256);
-        RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            float centerX = (absBoxX1 + absBoxX2) / 2.0F;
+            float centerY = (absBoxY1 + absBoxY2) / 2.0F;
+            float mouseX = centerX + 17;
+            float mouseY = centerY - 12;
 
-        RenderSystem.enableBlend();
-        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ZERO, GlStateManager.DestFactor.ONE);
-        guiGraphics.blit(DAMAGE_INDICATOR_TEXTURE, 0, 0, 50, 0, 0, 208, 78, 256, 256);
-        RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            pose.popMatrix();
+            guiGraphics.enableScissor(absBoxX1, absBoxY1, absBoxX2, absBoxY2);
+            InventoryScreen.extractEntityInInventoryFollowsMouse(
+                    guiGraphics,
+                    absBoxX1, absBoxY1, absBoxX2, absBoxY2,
+                    renderScale, 0.0625F,
+                    mouseX, mouseY,
+                    damageIndicatorEntity);
+            guiGraphics.disableScissor();
+            pose.pushMatrix();
+            pose.translate(xOffset, yOffset - 0.5F);
+            pose.scale(scale, scale);
+        }
 
-        int relativeMobTypeX = 5, relativeMobTypeY = 55;
-        guiGraphics.blit(currentMobType.getTexture(), relativeMobTypeX, relativeMobTypeY, 50, 0, 0, 18, 18, 18, 18);
+        int bgColor = ((int)(backgroundOpacity * 255) << 24) | 0xFFFFFF;
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_BACKGROUND_TEXTURE, 0, 0, 0, 0, 208, 78, 256, 256, bgColor);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_TEXTURE, 0, 0, 0, 0, 208, 78, 256, 256);
+
+        int relativeMobTypeX = 5;
+        int relativeMobTypeY = 55;
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, currentMobType.getTexture(), relativeMobTypeX, relativeMobTypeY, 0, 0, 18, 18, 18, 18);
 
         int healthbarVOffset = Config.INSTANCE.colorblindHealthBar.get() ? 36 : 0;
-        guiGraphics.blit(DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 50, 0, healthbarVOffset + 18, healthbarMaxWidth, healthbarHeight, 256, 256);
-        guiGraphics.blit(DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 50, 0, healthbarVOffset, currentHealthbarWidth, healthbarHeight, 256, 256);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 0, healthbarVOffset + 18, healthbarMaxWidth, healthbarHeight, 256, 256);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, DAMAGE_INDICATOR_HEALTH_TEXTURE, relativeHealthbarX, relativeHealthbarY, 0, healthbarVOffset, currentHealthbarWidth, healthbarHeight, 256, 256);
 
-        poseStack.popPose();
-
-        // health text
         String healthText;
-        float healthOffsetX = 136, healthOffsetY = 30;
+        float healthOffsetX = 136;
+        float healthOffsetY = 30;
         String healthDivisor;
         int firstHalfWidth;
         if (Config.INSTANCE.healthSeperator.get()) {
@@ -183,38 +193,29 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
         Component healthComponent = Component.literal(healthText);
         int healthWidth = Minecraft.getInstance().font.width(healthComponent);
         float healthScale = Math.min(88F / (float) healthWidth, 1.35F);
-        int healthColor = 0xFFFFFF, healthOutlineColor = 0;
+        int healthColor = 0xFFFFFFFF;
 
-        poseStack.pushPose();
-        poseStack.translate(healthOffsetX, healthOffsetY, 0);
-        poseStack.scale(healthScale, healthScale, 1);
-        poseStack.translate(-firstHalfWidth, 0, -50);
-        if (Config.INSTANCE.hudHealthTextOutline.get()) {
-            Minecraft.getInstance().font.drawInBatch8xOutline(healthComponent.getVisualOrderText(), 0.0F, 0.0F, healthColor, healthOutlineColor, poseStack.last().pose(), guiGraphics.bufferSource(), 15728880);
-        } else {
-            Minecraft.getInstance().font.drawInBatch(healthComponent.getVisualOrderText(), 0.0F, 0.0F, healthColor, true, poseStack.last().pose(), guiGraphics.bufferSource(), Font.DisplayMode.NORMAL, 0, 15728880);
-        }
-        poseStack.popPose();
+        pose.pushMatrix();
+        pose.translate(healthOffsetX, healthOffsetY);
+        pose.scale(healthScale, healthScale);
+        pose.translate(-firstHalfWidth, 0);
+        guiGraphics.text(Minecraft.getInstance().font, healthComponent, 0, 0, healthColor, Config.INSTANCE.hudHealthTextOutline.get());
+        pose.popMatrix();
 
-        // name text
         Component nameComponent = damageIndicatorEntity.getDisplayName();
         int nameWidth = Minecraft.getInstance().font.width(nameComponent);
         float nameScale = Math.min(113F / (float) nameWidth, 1.25F);
-        float nameOffsetX = 138.5F, nameOffsetY = 6.5F;
-        int nameColor = 0xFFFFFF, nameOutlineColor = 0;
+        float nameOffsetX = 138.5F;
+        float nameOffsetY = 6.5F;
+        int nameColor = 0xFFFFFFFF;
 
-        poseStack.pushPose();
-        poseStack.translate(nameOffsetX, nameOffsetY, 0);
-        poseStack.scale(nameScale, nameScale, 1);
-        poseStack.translate(-nameWidth / 2F, 0, -50);
-        if (Config.INSTANCE.hudNameTextOutline.get()) {
-            Minecraft.getInstance().font.drawInBatch8xOutline(nameComponent.getVisualOrderText(), 0.0F, 0.0F, nameColor, nameOutlineColor, poseStack.last().pose(), guiGraphics.bufferSource(), 15728880);
-        } else {
-            Minecraft.getInstance().font.drawInBatch(nameComponent.getVisualOrderText(), 0.0F, 0.0F, nameColor, true, poseStack.last().pose(), guiGraphics.bufferSource(), Font.DisplayMode.NORMAL, 0, 15728880);
-        }
-        poseStack.popPose();
+        pose.pushMatrix();
+        pose.translate(nameOffsetX, nameOffsetY);
+        pose.scale(nameScale, nameScale);
+        pose.translate(-nameWidth / 2F, 0);
+        guiGraphics.text(Minecraft.getInstance().font, nameComponent, 0, 0, nameColor, Config.INSTANCE.hudNameTextOutline.get());
+        pose.popMatrix();
 
-        // mod source text
         if (Config.INSTANCE.showModSource.get() && !currentModSource.isEmpty()) {
             Component modSourceComponent = Component.literal("[" + currentModSource + "]");
             int modSourceWidth = Minecraft.getInstance().font.width(modSourceComponent);
@@ -222,43 +223,35 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
             float modSourceScale = Math.min(110F / modSourceWidth, maxScale);
             float modSourceX = 143F + Config.INSTANCE.modSourceOffsetX.get();
             float modSourceY = 46F + Config.INSTANCE.modSourceOffsetY.get();
-            int modSourceColor = Config.INSTANCE.modSourceColor.get();
+            int modSourceColor = 0xFF000000 | Config.INSTANCE.modSourceColor.get();
 
-            poseStack.pushPose();
-            poseStack.translate(modSourceX, modSourceY, -50);
-            poseStack.scale(modSourceScale, modSourceScale, 1);
-            poseStack.translate(-modSourceWidth / 2F, 0, 0);
-            Minecraft.getInstance().font.drawInBatch(modSourceComponent.getVisualOrderText(), 0.0F, 0.0F, modSourceColor, false, poseStack.last().pose(), guiGraphics.bufferSource(), Font.DisplayMode.NORMAL, 0, 15728880);
-            poseStack.popPose();
+            pose.pushMatrix();
+            pose.translate(modSourceX, modSourceY);
+            pose.scale(modSourceScale, modSourceScale);
+            pose.translate(-modSourceWidth / 2F, 0);
+            guiGraphics.text(Minecraft.getInstance().font, modSourceComponent, 0, 0, modSourceColor, false);
+            pose.popMatrix();
         }
 
-        // damage flash overlay
         if (Config.INSTANCE.damageFlash.get() && damageFlashTicks > 0) {
             float flashAlpha = (damageFlashTicks / (float) Config.INSTANCE.damageFlashDuration.get()) * 0.45f;
             int color = ((int)(flashAlpha * 255) << 24) | 0xFF2200;
             guiGraphics.fill(0, 0, 208, 78, color);
         }
 
-        poseStack.popPose();
-    }
-
-    private static float computeRenderScale() {
-        float biggestEntityDimension = Math.max(damageIndicatorEntity.getBbWidth() * 1.2F + 0.3F, damageIndicatorEntity.getBbHeight() * 0.9F) * 0.85F;
-        float renderScale = Config.INSTANCE.hudEntitySize.get().floatValue();
-        if ((double) biggestEntityDimension > 0.5D) renderScale /= biggestEntityDimension;
-        return renderScale;
+        pose.popMatrix();
     }
 
     private static void onClientTick(Minecraft client) {
-        if (client.cameraEntity == null) {
+        if (client.getCameraEntity() == null) {
             activeDamageTexts.clear();
             return;
         }
-        Entity cameraEntity = client.cameraEntity;
+        Entity cameraEntity = client.getCameraEntity();
         double maxPickDistance = Config.INSTANCE.maxDistance.get();
         double pickDistance = maxPickDistance;
-        Vec3 vec3 = cameraEntity.getEyePosition(client.getTimer().getGameTimeDeltaPartialTick(true));
-        HitResult hitResult = cameraEntity.pick(pickDistance, client.getTimer().getGameTimeDeltaPartialTick(true), false);
+        Vec3 vec3 = cameraEntity.getEyePosition(client.getDeltaTracker().getGameTimeDeltaPartialTick(true));
+        HitResult hitResult = cameraEntity.pick(pickDistance, client.getDeltaTracker().getGameTimeDeltaPartialTick(true), false);
         LivingEntity found = null;
         if (hitResult != null && hitResult.getType() != HitResult.Type.MISS) {
             pickDistance = hitResult.getLocation().distanceToSqr(vec3);
@@ -296,7 +289,6 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
             damageIndicatorEntity = found;
             currentMobType = MobTypes.getTypeFor(found);
             resetDamageIndicatorEntityIn = Config.INSTANCE.hudLingerTime.get();
-            renderModelOnly = Config.INSTANCE.oldRenderEntities.get().contains(BuiltInRegistries.ENTITY_TYPE.getKey(found.getType()).toString());
             String modId = BuiltInRegistries.ENTITY_TYPE.getKey(found.getType()).getNamespace();
             currentModSource = FabricLoader.getInstance().getModContainer(modId)
                     .map(c -> c.getMetadata().getName())
@@ -321,75 +313,33 @@ public class RetroDamageIndicatorsClient implements ClientModInitializer {
         }
     }
 
-    private static void onWorldRender(WorldRenderContext context) {
+    private static void onWorldRender(LevelRenderContext context) {
         if (activeDamageTexts.isEmpty() || !Config.INSTANCE.damageParticlesEnabled.get()) return;
 
-        PoseStack poseStack = context.matrixStack();
+        PoseStack poseStack = context.poseStack();
         if (poseStack == null) return;
-        MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        Vec3 cameraPos = context.camera().getPosition();
+        SubmitNodeCollector collector = context.submitNodeCollector();
+        CameraRenderState cameraState = context.levelState().cameraRenderState;
+        Vec3 cameraPos = cameraState.pos;
+        Quaternionf cameraRotation = cameraState.orientation;
 
         for (DamageText dt : activeDamageTexts) {
             float lifeRatio = 1.0f - (float) dt.age / dt.maxAge;
-            float scale = 0.025f * lifeRatio * Config.INSTANCE.damageParticleSize.get().floatValue();
-            if (scale <= 0) continue;
+            float dtScale = 0.025f * lifeRatio * Config.INSTANCE.damageParticleSize.get().floatValue();
+            if (dtScale <= 0) continue;
 
             poseStack.pushPose();
             poseStack.translate(dt.x - cameraPos.x, dt.y - cameraPos.y, dt.z - cameraPos.z);
-            poseStack.mulPose(context.camera().rotation());
+            poseStack.mulPose(cameraRotation);
             poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-            poseStack.scale(scale, scale, scale);
+            poseStack.scale(dtScale, dtScale, dtScale);
 
             float textX = -Minecraft.getInstance().font.width(dt.text) / 2f;
-            if (Config.INSTANCE.damageParticleOutline.get()) {
-                Minecraft.getInstance().font.drawInBatch8xOutline(
-                        dt.text.getVisualOrderText(), textX, 0f,
-                        dt.color, dt.colorOutline,
-                        poseStack.last().pose(), bufferSource, 15728880);
-            } else {
-                Minecraft.getInstance().font.drawInBatch(
-                        dt.text.getVisualOrderText(), textX, 0f,
-                        dt.color, false, poseStack.last().pose(), bufferSource,
-                        Font.DisplayMode.SEE_THROUGH, 0, 15728880);
-            }
+            int outlineColor = Config.INSTANCE.damageParticleOutline.get() ? dt.colorOutline : 0;
+            collector.submitText(poseStack, textX, 0f, dt.text.getVisualOrderText(), false,
+                    Font.DisplayMode.SEE_THROUGH, 0, dt.color, 15728880, outlineColor);
             poseStack.popPose();
         }
-        bufferSource.endBatch();
-    }
-
-    public static void renderEntityInGui(GuiGraphics guiGraphics, int xPos, int yPos, float scale, Quaternionf rotation, Entity entity, float partialTicks) {
-        guiGraphics.pose().pushPose();
-        guiGraphics.pose().translate((double) xPos, (double) yPos, -60.0D);
-        guiGraphics.pose().mulPose((new Matrix4f()).scaling(scale, scale, (-scale)));
-        guiGraphics.pose().mulPose(rotation);
-
-        Vector3f light0 = new Vector3f(1, -1.0F, -1.0F).normalize();
-        Vector3f light1 = new Vector3f(-1, 1.0F, 1.0F).normalize();
-        RenderSystem.setShaderLights(light0, light1);
-        EntityRenderDispatcher entityrenderdispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
-        entityrenderdispatcher.setRenderShadow(false);
-        if (renderModelOnly && entityrenderdispatcher.getRenderer(entity) instanceof LivingEntityRenderer livingEntityRenderer) {
-            guiGraphics.pose().translate(0, 1.5F, 0.0D);
-            guiGraphics.pose().mulPose(Axis.XP.rotationDegrees(180.0F));
-            RenderType renderType = livingEntityRenderer.getModel().renderType(livingEntityRenderer.getTextureLocation(entity));
-            livingEntityRenderer.getModel().renderToBuffer(guiGraphics.pose(), guiGraphics.bufferSource().getBuffer(renderType), 15728880,
-                    LivingEntityRenderer.getOverlayCoords((LivingEntity) entity, 0.0F));
-        } else {
-            float f = entity.yRotO + (entity.getYRot() - entity.yRotO) * partialTicks;
-            if (entity instanceof LivingEntity living) {
-                float f1 = living.yBodyRotO + (living.yBodyRot - living.yBodyRotO) * partialTicks;
-                guiGraphics.pose().mulPose(Axis.YN.rotationDegrees(-f1));
-            } else {
-                guiGraphics.pose().mulPose(Axis.YN.rotationDegrees(-f));
-            }
-            RenderSystem.runAsFancy(() -> {
-                entityrenderdispatcher.render(entity, 0.0D, 0.0D, 0.0D, 0.0F, partialTicks, guiGraphics.pose(), guiGraphics.bufferSource(), 15728880);
-            });
-        }
-        guiGraphics.flush();
-        entityrenderdispatcher.setRenderShadow(true);
-        guiGraphics.pose().popPose();
-        Lighting.setupFor3DItems();
     }
 
     static class DamageText {
