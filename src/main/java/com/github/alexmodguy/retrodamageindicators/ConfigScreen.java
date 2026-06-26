@@ -110,8 +110,9 @@ public class ConfigScreen {
                 .setDefaultValue(5)
                 .setSaveConsumer(v -> Config.INSTANCE.modSourceOffsetY.set(v)).build());
 
-        hud.addEntry(eb.startColorField(Component.literal("Mod Source Color"), Config.INSTANCE.modSourceColor.get())
+        hud.addEntry(eb.startIntField(Component.literal("Mod Source Color (RGB)"), Config.INSTANCE.modSourceColor.get())
                 .setDefaultValue(0xAAAAAA)
+                .setMin(0x000000).setMax(0xFFFFFF)
                 .setSaveConsumer(v -> Config.INSTANCE.modSourceColor.set(v)).build());
 
         ConfigCategory particles = builder.getOrCreateCategory(Component.literal("Damage Particles"));
