@@ -1,5 +1,6 @@
 package com.github.alexmodguy.retrodamageindicators;
 
+import net.fabricmc.fabric.api.tag.convention.v2.ConventionalEntityTypeTags;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.entity.*;
@@ -9,8 +10,6 @@ import net.minecraft.world.entity.animal.WaterAnimal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.neoforge.common.Tags;
-
 
 import java.util.Locale;
 
@@ -42,7 +41,7 @@ public enum MobTypes {
             return PLAYER;
         }
         if(entity instanceof LivingEntity living){
-            if(living.getType().is(Tags.EntityTypes.BOSSES)){
+            if(living.getType().is(ConventionalEntityTypeTags.BOSSES)){
                 return BOSS;
             }
             if(living.getType().is(EntityTypeTags.AQUATIC)){
